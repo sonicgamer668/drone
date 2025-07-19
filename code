@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hyderabad Drone Controller</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; }
+    #map { height: 300px; margin: 20px 0; border: 1px solid #ccc; }
+    button { background: #0066cc; color: white; border: none; padding: 10px 15px; cursor: pointer; }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <h1>Drone Navigator</h1>
+  <div id="map"></div>
+  <input type="text" id="target" placeholder="Enter GPS or What3Words (e.g., ///filled.soaps.rains)">
+  <button onclick="sendCoordinates()">Send to Drone</button>
+  <p id="status">Status: Ready</p>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([17.3850, 78.4867], 12); // Hyderabad center
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    let marker = L.marker([17.3850, 78.4867]).addTo(map);
+
+    async function sendCoordinates() {
+      const input = document.getElementById('target').value;
+      document.getElementById('status').textContent = "Status: Sending...";
+      
+      try {
+        // Convert What3Words to GPS if needed
+        let coords = input.startsWith('///') ? await w3wToGPS(input) : input;
+        
+        // Send to Arduino via 4G
+        const response = await fetch(`http://${arduinoIP}/navigate?coords=${encodeURIComponent(coords)}`);
+        document.getElementById('status').textContent = `Status: ${await response.text()}`;
+        
+        // Update map
+        const [lat, lon] = coords.split(',').map(Number);
+        marker.setLatLng([lat, lon]);
+      } catch (err) {
+        document.getElementById('status').textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function w3wToGPS(words) {
+      const response = await fetch(`https://api.what3words.com/v3/convert-to-coordinates?words=${words.replace('///','')}&key=YOUR_API_KEY`);
+      const data = await response.json();
+      return `${data.coordinates.lat},${data.coordinates.lng}`;
+    }
+  </script>
+</body>
+</html>
